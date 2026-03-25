@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getRiskLimits } from '../api'
 
-function ProgressBar({ pct, color }) {
+function ProgressBar({ pct, breached }) {
   const clampedPct = Math.min(pct, 100)
-  const barColor = pct > 80 ? 'bg-red-500' : pct > 60 ? 'bg-yellow-500' : color
+  const barColor = breached ? 'bg-red-500' : pct > 80 ? 'bg-yellow-500' : 'bg-blue-500'
   return (
     <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
       <div
@@ -14,15 +14,16 @@ function ProgressBar({ pct, color }) {
   )
 }
 
-export default function RiskLimits({ onLimitsLoaded }) {
-  const [limits, setLimits] = useState(null)
+export default function RiskLimits({ onLimitsLoaded, onHaltedChange }) {
+  const [limits, setLimits]   = useState(null)
   const [loading, setLoading] = useState(true)
 
   const fetchLimits = async () => {
     try {
       const data = await getRiskLimits()
       setLimits(data)
-      if (onLimitsLoaded) onLimitsLoaded(data.allowed_symbols)
+      if (onLimitsLoaded)   onLimitsLoaded(data.allowed_symbols)
+      if (onHaltedChange)   onHaltedChange(data.trading_halted)
     } catch (err) {
       console.error('Failed to fetch risk limits:', err)
     } finally {
@@ -32,7 +33,7 @@ export default function RiskLimits({ onLimitsLoaded }) {
 
   useEffect(() => {
     fetchLimits()
-    const interval = setInterval(fetchLimits, 30000)
+    const interval = setInterval(fetchLimits, 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -45,10 +46,19 @@ export default function RiskLimits({ onLimitsLoaded }) {
   if (!limits) return null
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <div className={`bg-gray-900 border rounded-xl p-5 ${
+      limits.trading_halted ? 'border-red-700' : 'border-gray-800'
+    }`}>
       <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4">
         ⚖️ Risk Limits
       </h2>
+
+      {/* Trading Halted Banner */}
+      {limits.trading_halted && (
+        <div className="bg-red-950 border border-red-700 rounded-lg px-3 py-2 mb-4 text-xs text-red-300 font-bold text-center">
+          🚨 TRADING HALTED — Limits Breached
+        </div>
+      )}
 
       {/* Allowed Symbols */}
       <div className="mb-4">
@@ -62,34 +72,43 @@ export default function RiskLimits({ onLimitsLoaded }) {
         </div>
       </div>
 
-      {/* Notional Usage */}
+      {/* Net Notional */}
       <div className="mb-4">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-gray-400">Total Notional Used</span>
-          <span className={`text-xs font-bold ${limits.notional_used_pct > 80 ? 'text-red-400' : 'text-green-400'}`}>
+          <span className="text-xs text-gray-400">Net Notional Used</span>
+          <span className={`text-xs font-bold ${
+            limits.notional_breached ? 'text-red-400' : limits.notional_used_pct > 80 ? 'text-yellow-400' : 'text-green-400'
+          }`}>
             {limits.notional_used_pct}%
+            {limits.notional_breached && ' ⚠️'}
           </span>
         </div>
-        <ProgressBar pct={limits.notional_used_pct} color="bg-blue-500" />
+        <ProgressBar pct={limits.notional_used_pct} breached={limits.notional_breached} />
         <div className="flex justify-between mt-1">
-          <span className="text-xs text-gray-600">
-            ${limits.current_notional.toLocaleString(undefined, {maximumFractionDigits: 0})}
-          </span>
-          <span className="text-xs text-gray-600">
-            ${limits.max_notional.toLocaleString()} max
-          </span>
+          <div className="text-xs text-gray-600">
+            <span className="text-green-600">↑ ${Math.round(limits.buy_notional).toLocaleString()}</span>
+            <span className="mx-1 text-gray-700">|</span>
+            <span className="text-red-600">↓ ${Math.round(limits.sell_notional).toLocaleString()}</span>
+          </div>
+          <span className="text-xs text-gray-600">${limits.max_notional.toLocaleString()} max</span>
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          Net: ${Math.round(limits.current_notional).toLocaleString()}
         </div>
       </div>
 
-      {/* Position Usage */}
+      {/* Max Position */}
       <div className="mb-4">
         <div className="flex justify-between items-center">
           <span className="text-xs text-gray-400">Max Position Size</span>
-          <span className={`text-xs font-bold ${limits.position_used_pct > 80 ? 'text-red-400' : 'text-green-400'}`}>
+          <span className={`text-xs font-bold ${
+            limits.position_breached ? 'text-red-400' : limits.position_used_pct > 80 ? 'text-yellow-400' : 'text-green-400'
+          }`}>
             {limits.position_used_pct}%
+            {limits.position_breached && ' ⚠️'}
           </span>
         </div>
-        <ProgressBar pct={limits.position_used_pct} color="bg-purple-500" />
+        <ProgressBar pct={limits.position_used_pct} breached={limits.position_breached} />
         <div className="flex justify-between mt-1">
           <span className="text-xs text-gray-600">
             {limits.current_max_position.toLocaleString()} shares
@@ -100,13 +119,17 @@ export default function RiskLimits({ onLimitsLoaded }) {
         </div>
       </div>
 
-      {/* Status */}
+      {/* Overall Status */}
       <div className={`text-xs px-3 py-2 rounded-lg text-center font-bold ${
-        limits.notional_used_pct > 80 || limits.position_used_pct > 80
+        limits.trading_halted
           ? 'bg-red-900 text-red-300'
+          : limits.notional_used_pct > 80 || limits.position_used_pct > 80
+          ? 'bg-yellow-900 text-yellow-300'
           : 'bg-green-900 text-green-300'
       }`}>
-        {limits.notional_used_pct > 80 || limits.position_used_pct > 80
+        {limits.trading_halted
+          ? '🚨 Limits Breached — No New Trades'
+          : limits.notional_used_pct > 80 || limits.position_used_pct > 80
           ? '⚠️ Approaching Limits'
           : '✅ Within Risk Limits'}
       </div>

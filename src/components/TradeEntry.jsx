@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { submitTrade } from '../api'
 import { toast } from 'react-hot-toast'
 
-export default function TradeEntry({ onTradeSubmit, loading, allowedSymbols }) {
+export default function TradeEntry({ onTradeSubmit, loading, allowedSymbols, tradingHalted }) {
   const [symbol, setSymbol] = useState('AAPL')
   const [side, setSide] = useState('BUY')
   const [quantity, setQuantity] = useState('100')
@@ -161,17 +161,24 @@ export default function TradeEntry({ onTradeSubmit, loading, allowedSymbols }) {
         </div>
       </div>
 
+{/* Trading Halted Warning */}
+      {tradingHalted && (
+        <div className="mb-3 bg-red-950 border border-red-700 rounded-lg px-3 py-2 text-xs text-red-300 text-center font-bold">
+          🚨 Trading Halted — Risk Limits Breached
+        </div>
+      )}
+
       {/* Submit */}
       <button
         onClick={handleSubmit}
-        disabled={loading || !!symbolError}
+        disabled={loading || !!symbolError || tradingHalted}
         className={`w-full py-3 rounded-lg text-sm font-bold transition-all ${
-          loading || symbolError
+          loading || symbolError || tradingHalted
             ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
             : 'bg-blue-600 hover:bg-blue-500 text-white'
         }`}
       >
-        {loading ? '⏳ Processing...' : '🚀 Execute Trade'}
+        {loading ? '⏳ Processing...' : tradingHalted ? '🚨 Trading Halted' : '🚀 Execute Trade'}
       </button>
     </div>
   )

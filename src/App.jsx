@@ -10,10 +10,15 @@ import { getTrades, getPositions } from './api'
 export default function App() {
   const [trades, setTrades]                 = useState([])
   const [positions, setPositions]           = useState([])
-  const [activeRequest, setActiveRequest]   = useState(null)
-  const [loading, setLoading]               = useState(false)
+  const [activeRequest, setActiveRequest]   = useState(
+    () => sessionStorage.getItem('activeRequest') || null
+  )
+  const [loading, setLoading]               = useState(
+    () => sessionStorage.getItem('activeRequest') ? true : false
+  )
   const [allowedSymbols, setAllowedSymbols] = useState([])
   const [tradeComplete, setTradeComplete]   = useState(false)
+  const [tradingHalted, setTradingHalted]   = useState(false)
 
   const fetchData = async () => {
     try {
@@ -38,6 +43,7 @@ export default function App() {
     toast.success('Trade completed successfully!')
     setLoading(false)
     setTradeComplete(true)
+    sessionStorage.removeItem('activeRequest')
     fetchData()
   }
 
@@ -45,11 +51,14 @@ export default function App() {
     setActiveRequest(requestId)
     setLoading(true)
     setTradeComplete(false)
+    sessionStorage.setItem('activeRequest', requestId)
   }
 
   const handleDismiss = () => {
     setActiveRequest(null)
     setTradeComplete(false)
+    setLoading(false)
+    sessionStorage.removeItem('activeRequest')
   }
 
   return (
@@ -67,8 +76,17 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-xs text-gray-400">All Agents Online</span>
+            {tradingHalted ? (
+              <>
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-red-400 font-bold">⚠️ Trading Halted — Limits Breached</span>
+              </>
+            ) : (
+              <>
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-xs text-gray-400">All Agents Online</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -82,8 +100,12 @@ export default function App() {
             onTradeSubmit={handleTradeSubmit}
             loading={loading}
             allowedSymbols={allowedSymbols}
+            tradingHalted={tradingHalted}
           />
-          <RiskLimits onLimitsLoaded={setAllowedSymbols} />
+          <RiskLimits
+            onLimitsLoaded={setAllowedSymbols}
+            onHaltedChange={setTradingHalted}
+          />
           <PositionSummary positions={positions} />
         </div>
 
