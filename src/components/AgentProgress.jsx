@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { pollStatus } from '../api'
 import TradeResult from './TradeResult'
 
@@ -11,46 +11,55 @@ const AGENTS = [
 ]
 
 export default function AgentProgress({ requestId, onComplete }) {
-  const [status, setStatus]               = useState('PROCESSING')
-  const [result, setResult]               = useState(null)
-  const [activeAgent, setActiveAgent]     = useState(0)
-  const [completedAgents, setCompletedAgents] = useState([])
+  const [status, setStatus]           = useState('PROCESSING')
+  const [result, setResult]           = useState(null)
+  const [activeAgent, setActiveAgent] = useState(0)
+  const [doneAgents, setDoneAgents]   = useState([])
+  const startTime                     = useRef(Date.now())
+  const timerRef                      = useRef(null)
+  const pollRef                       = useRef(null)
 
-  // Advance agent indicator every 15 seconds
+  // Advance one agent every 20 seconds while processing
   useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveAgent(a => {
-        if (a < AGENTS.length - 1) {
-          setCompletedAgents(prev => [...new Set([...prev, a])])
-          return a + 1
-        }
-        return a
-      })
-    }, 15000)
-    return () => clearInterval(interval)
+    timerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime.current) / 20000)
+      const next = Math.min(elapsed, AGENTS.length - 1)
+      setActiveAgent(next)
+      setDoneAgents(Array.from({ length: next }, (_, i) => i))
+    }, 2000)
+    return () => clearInterval(timerRef.current)
   }, [])
 
-  // Poll for completion every 5 seconds
+  // Poll every 5 seconds
   useEffect(() => {
-    const poll = setInterval(async () => {
+    pollRef.current = setInterval(async () => {
       try {
         const data = await pollStatus(requestId)
         setStatus(data.status)
+
         if (data.status === 'COMPLETED') {
-          clearInterval(poll)
-          setCompletedAgents([0, 1, 2, 3, 4])
+          clearInterval(pollRef.current)
+          clearInterval(timerRef.current)
+          // Mark ALL agents as done immediately
+          setDoneAgents([0, 1, 2, 3, 4])
+          setActiveAgent(4)
           setResult(data.result)
           onComplete(data.result)
         } else if (data.status === 'FAILED') {
-          clearInterval(poll)
+          clearInterval(pollRef.current)
+          clearInterval(timerRef.current)
+          setDoneAgents([0, 1, 2, 3, 4])
           setResult(data.error)
         }
       } catch (err) {
         console.error('Poll error:', err)
       }
     }, 5000)
-    return () => clearInterval(poll)
+    return () => clearInterval(pollRef.current)
   }, [requestId])
+
+  const isCompleted = (idx) => doneAgents.includes(idx)
+  const isActive    = (idx) => activeAgent === idx && status === 'PROCESSING' && !isCompleted(idx)
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
@@ -81,37 +90,35 @@ export default function AgentProgress({ requestId, onComplete }) {
 
       {/* Agent Steps */}
       <div className="flex flex-col gap-2 mb-2">
-        {AGENTS.map((agent, idx) => {
-          const isCompleted = completedAgents.includes(idx) || status === 'COMPLETED'
-          const isActive    = activeAgent === idx && status === 'PROCESSING'
-          return (
-            <div
-              key={agent.key}
-              className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-500 ${
-                isCompleted
-                  ? 'bg-green-950 border-green-800'
-                  : isActive
-                  ? 'bg-blue-950 border-blue-700'
-                  : 'bg-gray-800 border-gray-700'
-              }`}
-            >
-              <span className="text-lg">{agent.icon}</span>
-              <div className="flex-1">
-                <div className={`text-xs font-bold ${
-                  isCompleted ? 'text-green-400' : isActive ? 'text-blue-400' : 'text-gray-500'
-                }`}>
-                  {agent.label}
-                </div>
-                <div className="text-xs text-gray-500">{agent.desc}</div>
+        {AGENTS.map((agent, idx) => (
+          <div
+            key={agent.key}
+            className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-700 ${
+              isCompleted(idx)
+                ? 'bg-green-950 border-green-800'
+                : isActive(idx)
+                ? 'bg-blue-950 border-blue-700'
+                : 'bg-gray-800 border-gray-700'
+            }`}
+          >
+            <span className="text-lg">{agent.icon}</span>
+            <div className="flex-1">
+              <div className={`text-xs font-bold ${
+                isCompleted(idx) ? 'text-green-400'
+                : isActive(idx)  ? 'text-blue-400'
+                : 'text-gray-500'
+              }`}>
+                {agent.label}
               </div>
-              <div className="text-sm">
-                {isCompleted && '✅'}
-                {isActive    && <span className="inline-block animate-spin">⚙️</span>}
-                {!isCompleted && !isActive && <span className="text-gray-600">⏸</span>}
-              </div>
+              <div className="text-xs text-gray-500">{agent.desc}</div>
             </div>
-          )
-        })}
+            <div className="text-sm w-5 text-center">
+              {isCompleted(idx) && '✅'}
+              {isActive(idx)    && <span className="inline-block animate-spin">⚙️</span>}
+              {!isCompleted(idx) && !isActive(idx) && <span className="text-gray-600">⏸</span>}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Rich Trade Result */}
