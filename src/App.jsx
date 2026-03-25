@@ -8,11 +8,12 @@ import RiskLimits from './components/RiskLimits'
 import { getTrades, getPositions } from './api'
 
 export default function App() {
-  const [trades, setTrades]               = useState([])
-  const [positions, setPositions]         = useState([])
-  const [activeRequest, setActiveRequest] = useState(null)
-  const [loading, setLoading]             = useState(false)
+  const [trades, setTrades]                 = useState([])
+  const [positions, setPositions]           = useState([])
+  const [activeRequest, setActiveRequest]   = useState(null)
+  const [loading, setLoading]               = useState(false)
   const [allowedSymbols, setAllowedSymbols] = useState([])
+  const [tradeComplete, setTradeComplete]   = useState(false)
 
   const fetchData = async () => {
     try {
@@ -35,13 +36,20 @@ export default function App() {
 
   const handleTradeComplete = (result) => {
     toast.success('Trade completed successfully!')
-    fetchData()
     setLoading(false)
+    setTradeComplete(true)
+    fetchData()
   }
 
   const handleTradeSubmit = (requestId) => {
     setActiveRequest(requestId)
     setLoading(true)
+    setTradeComplete(false)
+  }
+
+  const handleDismiss = () => {
+    setActiveRequest(null)
+    setTradeComplete(false)
   }
 
   return (
@@ -82,10 +90,20 @@ export default function App() {
         {/* Right Column */}
         <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
           {activeRequest && (
-            <AgentProgress
-              requestId={activeRequest}
-              onComplete={handleTradeComplete}
-            />
+            <div>
+              <AgentProgress
+                requestId={activeRequest}
+                onComplete={handleTradeComplete}
+              />
+              {tradeComplete && (
+                <button
+                  onClick={handleDismiss}
+                  className="mt-3 w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-xs rounded-lg transition-all border border-gray-700"
+                >
+                  ✕ Dismiss & Book Another Trade
+                </button>
+              )}
+            </div>
           )}
           <TradeBlotter trades={trades} onRefresh={fetchData} />
         </div>
