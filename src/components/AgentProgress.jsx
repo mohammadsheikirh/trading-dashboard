@@ -1,28 +1,27 @@
 import { useState, useEffect } from 'react'
 import { pollStatus } from '../api'
+import TradeResult from './TradeResult'
 
 const AGENTS = [
-  { key: 'price',    icon: '💹', label: 'Price Agent',        desc: 'Fetching market price' },
-  { key: 'news',     icon: '📰', label: 'News Agent',         desc: 'Analyzing sentiment' },
-  { key: 'risk',     icon: '⚖️', label: 'Risk Agent',         desc: 'Validating risk limits' },
-  { key: 'booking',  icon: '🔖', label: 'Trade Booking Agent', desc: 'Booking trade' },
-  { key: 'lifecycle',icon: '🏦', label: 'Lifecycle Agent',    desc: 'Confirming trade' },
+  { key: 'price',     icon: '💹', label: 'Price Agent',         desc: 'Fetching market price' },
+  { key: 'news',      icon: '📰', label: 'News Agent',          desc: 'Analyzing sentiment' },
+  { key: 'risk',      icon: '⚖️', label: 'Risk Agent',          desc: 'Validating risk limits' },
+  { key: 'booking',   icon: '🔖', label: 'Trade Booking Agent', desc: 'Booking trade' },
+  { key: 'lifecycle', icon: '🏦', label: 'Lifecycle Agent',     desc: 'Confirming trade' },
 ]
 
 export default function AgentProgress({ requestId, onComplete }) {
-  const [status, setStatus] = useState('PROCESSING')
-  const [result, setResult] = useState(null)
-  const [activeAgent, setActiveAgent] = useState(0)
+  const [status, setStatus]               = useState('PROCESSING')
+  const [result, setResult]               = useState(null)
+  const [activeAgent, setActiveAgent]     = useState(0)
   const [completedAgents, setCompletedAgents] = useState([])
-  const [elapsed, setElapsed] = useState(0)
 
   // Advance agent indicator every 15 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      setElapsed(e => e + 1)
       setActiveAgent(a => {
         if (a < AGENTS.length - 1) {
-          setCompletedAgents(prev => [...prev, a])
+          setCompletedAgents(prev => [...new Set([...prev, a])])
           return a + 1
         }
         return a
@@ -31,7 +30,7 @@ export default function AgentProgress({ requestId, onComplete }) {
     return () => clearInterval(interval)
   }, [])
 
-  // Poll for completion
+  // Poll for completion every 5 seconds
   useEffect(() => {
     const poll = setInterval(async () => {
       try {
@@ -39,7 +38,7 @@ export default function AgentProgress({ requestId, onComplete }) {
         setStatus(data.status)
         if (data.status === 'COMPLETED') {
           clearInterval(poll)
-          setCompletedAgents([0,1,2,3,4])
+          setCompletedAgents([0, 1, 2, 3, 4])
           setResult(data.result)
           onComplete(data.result)
         } else if (data.status === 'FAILED') {
@@ -55,12 +54,13 @@ export default function AgentProgress({ requestId, onComplete }) {
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider">
           🤖 Agent Pipeline
         </h2>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">{requestId}</span>
+          <span className="text-xs text-gray-500 font-mono">{requestId}</span>
           {status === 'PROCESSING' && (
             <span className="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded-full animate-pulse">
               Processing...
@@ -80,14 +80,14 @@ export default function AgentProgress({ requestId, onComplete }) {
       </div>
 
       {/* Agent Steps */}
-      <div className="flex flex-col gap-2 mb-4">
+      <div className="flex flex-col gap-2 mb-2">
         {AGENTS.map((agent, idx) => {
           const isCompleted = completedAgents.includes(idx) || status === 'COMPLETED'
-          const isActive = activeAgent === idx && status === 'PROCESSING'
+          const isActive    = activeAgent === idx && status === 'PROCESSING'
           return (
             <div
               key={agent.key}
-              className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+              className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-500 ${
                 isCompleted
                   ? 'bg-green-950 border-green-800'
                   : isActive
@@ -104,28 +104,24 @@ export default function AgentProgress({ requestId, onComplete }) {
                 </div>
                 <div className="text-xs text-gray-500">{agent.desc}</div>
               </div>
-              <div>
-                {isCompleted && <span className="text-green-400 text-sm">✅</span>}
-                {isActive && <span className="text-blue-400 text-sm animate-spin">⚙️</span>}
-                {!isCompleted && !isActive && <span className="text-gray-600 text-sm">⏸</span>}
+              <div className="text-sm">
+                {isCompleted && '✅'}
+                {isActive    && <span className="inline-block animate-spin">⚙️</span>}
+                {!isCompleted && !isActive && <span className="text-gray-600">⏸</span>}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* Result */}
+      {/* Rich Trade Result */}
       {result && status === 'COMPLETED' && (
-        <div className="bg-gray-800 rounded-lg p-3 mt-2">
-          <div className="text-xs font-bold text-green-400 mb-2">📋 Agent Response</div>
-          <div className="text-xs text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
-            {result}
-          </div>
-        </div>
+        <TradeResult result={result} />
       )}
 
+      {/* Error */}
       {result && status === 'FAILED' && (
-        <div className="bg-red-950 border border-red-800 rounded-lg p-3 mt-2">
+        <div className="bg-red-950 border border-red-800 rounded-lg p-3 mt-3">
           <div className="text-xs font-bold text-red-400 mb-1">❌ Error</div>
           <div className="text-xs text-red-300">{result}</div>
         </div>

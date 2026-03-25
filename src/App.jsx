@@ -4,13 +4,15 @@ import TradeEntry from './components/TradeEntry'
 import AgentProgress from './components/AgentProgress'
 import TradeBlotter from './components/TradeBlotter'
 import PositionSummary from './components/PositionSummary'
+import RiskLimits from './components/RiskLimits'
 import { getTrades, getPositions } from './api'
 
 export default function App() {
-  const [trades, setTrades] = useState([])
-  const [positions, setPositions] = useState([])
+  const [trades, setTrades]               = useState([])
+  const [positions, setPositions]         = useState([])
   const [activeRequest, setActiveRequest] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]             = useState(false)
+  const [allowedSymbols, setAllowedSymbols] = useState([])
 
   const fetchData = async () => {
     try {
@@ -34,7 +36,6 @@ export default function App() {
   const handleTradeComplete = (result) => {
     toast.success('Trade completed successfully!')
     fetchData()
-    setActiveRequest(null)
     setLoading(false)
   }
 
@@ -46,7 +47,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <Toaster position="top-right" />
-      
+
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-800 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -66,20 +67,22 @@ export default function App() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-12 gap-6">
-        
+
         {/* Left Column */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-          <TradeEntry 
+          <TradeEntry
             onTradeSubmit={handleTradeSubmit}
             loading={loading}
+            allowedSymbols={allowedSymbols}
           />
+          <RiskLimits onLimitsLoaded={setAllowedSymbols} />
           <PositionSummary positions={positions} />
         </div>
 
         {/* Right Column */}
         <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
           {activeRequest && (
-            <AgentProgress 
+            <AgentProgress
               requestId={activeRequest}
               onComplete={handleTradeComplete}
             />

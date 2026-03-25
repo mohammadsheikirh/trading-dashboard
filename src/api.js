@@ -24,3 +24,8 @@ export const getPositions = async () => {
   const response = await axios.get(`${API_BASE}/positions`);
   return response.data;
 };
+
+export const getRiskLimits = async () => {
+  const response = await axios.get(`${API_BASE}/risk-limits`);
+  return response.data;
+};
