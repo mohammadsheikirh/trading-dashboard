@@ -10,12 +10,8 @@ import { getTrades, getPositions } from './api'
 export default function App() {
   const [trades, setTrades]                 = useState([])
   const [positions, setPositions]           = useState([])
-  const [activeRequest, setActiveRequest]   = useState(
-    () => sessionStorage.getItem('activeRequest') || null
-  )
-  const [loading, setLoading]               = useState(
-    () => sessionStorage.getItem('activeRequest') ? true : false
-  )
+  const [activeRequest, setActiveRequest]   = useState(null)
+  const [loading, setLoading]               = useState(false)
   const [allowedSymbols, setAllowedSymbols] = useState([])
   const [tradeComplete, setTradeComplete]   = useState(false)
   const [tradingHalted, setTradingHalted]   = useState(false)
@@ -43,7 +39,6 @@ export default function App() {
     toast.success('Trade completed successfully!')
     setLoading(false)
     setTradeComplete(true)
-    sessionStorage.removeItem('activeRequest')
     fetchData()
   }
 
@@ -51,14 +46,12 @@ export default function App() {
     setActiveRequest(requestId)
     setLoading(true)
     setTradeComplete(false)
-    sessionStorage.setItem('activeRequest', requestId)
   }
 
   const handleDismiss = () => {
     setActiveRequest(null)
     setTradeComplete(false)
     setLoading(false)
-    sessionStorage.removeItem('activeRequest')
   }
 
   return (
@@ -114,6 +107,7 @@ export default function App() {
           {activeRequest && (
             <div>
               <AgentProgress
+                key={activeRequest}
                 requestId={activeRequest}
                 onComplete={handleTradeComplete}
               />
