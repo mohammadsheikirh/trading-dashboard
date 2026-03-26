@@ -29,13 +29,17 @@ export default function TradeEntry({ onTradeSubmit, loading, allowedSymbols, tra
     else setSymbolError('')
   }
 
-  const handleSubmit = async () => {
+   const handleSubmit = async () => {
     if (!validateSymbol(symbol)) {
       toast.error(`Symbol ${symbol} is not in the allowed list`)
       return
     }
     if (!quantity || Number(quantity) <= 0) {
       toast.error('Please enter a valid quantity')
+      return
+    }
+    if (tradingHalted && side === 'BUY') {
+      toast.error('BUY orders blocked — Risk limits breached. Only SELL permitted.')
       return
     }
     const message = `Get the price and news for ${symbol.toUpperCase()}, then book a ${tradeType} ${side} trade for ${quantity} shares at market price`
@@ -161,24 +165,30 @@ export default function TradeEntry({ onTradeSubmit, loading, allowedSymbols, tra
         </div>
       </div>
 
-{/* Trading Halted Warning */}
-      {tradingHalted && (
+     {  /* Trading Halted Warning */}
+      {tradingHalted && side === 'BUY' && (
         <div className="mb-3 bg-red-950 border border-red-700 rounded-lg px-3 py-2 text-xs text-red-300 text-center font-bold">
-          🚨 Trading Halted — Risk Limits Breached
+          🚨 BUY Halted — Risk Limits Breached. SELL orders permitted.
         </div>
       )}
 
       {/* Submit */}
       <button
         onClick={handleSubmit}
-        disabled={loading || !!symbolError || tradingHalted}
+        disabled={loading || !!symbolError || (tradingHalted && side === 'BUY')}
         className={`w-full py-3 rounded-lg text-sm font-bold transition-all ${
-          loading || symbolError || tradingHalted
+          loading || symbolError || (tradingHalted && side === 'BUY')
             ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+            : side === 'SELL'
+            ? 'bg-red-600 hover:bg-red-500 text-white'
             : 'bg-blue-600 hover:bg-blue-500 text-white'
         }`}
       >
-        {loading ? '⏳ Processing...' : tradingHalted ? '🚨 Trading Halted' : '🚀 Execute Trade'}
+        {loading
+          ? '⏳ Processing...'
+          : tradingHalted && side === 'BUY'
+          ? '🚨 BUY Halted'
+          : `🚀 Execute ${side}`}
       </button>
     </div>
   )
